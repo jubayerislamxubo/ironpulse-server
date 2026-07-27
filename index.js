@@ -4,15 +4,23 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 5000;
 
-
 app.use(cors());
 app.use(express.json());
 
-
+// In-memory Data Storage
 let bookingsData = [];
 let favoritesData = [];
 let applicationsData = [];
 
+// Admin User predefined
+let usersData = [
+  {
+    _id: "1",
+    name: "MD:JUBAYER ISLAM JUBO",
+    email: "admin@ironpulse.com",
+    role: "admin"
+  }
+];
 
 const classesData = [
   {
@@ -57,12 +65,78 @@ const classesData = [
   }
 ];
 
+// --- USER & ADMIN ROUTES --- //
+
+// Get user or check role by email
+app.get('/users', (req, res) => {
+  try {
+    const email = req.query.email;
+    if (email) {
+      const user = usersData.find(u => u.email === email);
+      return res.send(user || { role: 'user' });
+    }
+    res.send(usersData);
+  } catch (error) {
+    console.error("Fetch Users Error:", error);
+    res.status(500).send({ message: "Failed to fetch users" });
+  }
+});
+
+// Create or Update User
+app.post('/users', (req, res) => {
+  try {
+    const user = req.body;
+    const existingIndex = usersData.findIndex(u => u.email === user.email);
+
+    if (existingIndex > -1) {
+      usersData[existingIndex] = { ...usersData[existingIndex], ...user };
+      return res.send({ message: "User updated successfully", user: usersData[existingIndex] });
+    }
+
+    const newUser = { _id: Date.now().toString(), role: 'user', ...user };
+    usersData.push(newUser);
+    console.log("New User Created:", newUser);
+    res.status(201).send({ insertedId: newUser._id, acknowledged: true });
+  } catch (error) {
+    console.error("Save User Error:", error);
+    res.status(500).send({ message: "Failed to save user" });
+  }
+});
+
+// Check Admin Route
+app.get('/users/admin/:email', (req, res) => {
+  try {
+    const email = req.params.email;
+    const user = usersData.find(u => u.email === email);
+    res.send({ admin: user?.role === 'admin' });
+  } catch (error) {
+    console.error("Admin Check Error:", error);
+    res.status(500).send({ admin: false });
+  }
+});
+
+// Make Admin / Change Role Route
+app.patch('/users/admin/:id', (req, res) => {
+  try {
+    const id = req.params.id;
+    const user = usersData.find(u => u._id === id);
+    if (user) {
+      user.role = 'admin';
+      return res.send({ modifiedCount: 1, acknowledged: true });
+    }
+    res.status(404).send({ message: "User not found" });
+  } catch (error) {
+    console.error("Make Admin Error:", error);
+    res.status(500).send({ message: "Failed to update role" });
+  }
+});
+
+// --- CLASS ROUTES --- //
 
 app.get('/featured-classes', (req, res) => {
   const result = classesData.slice(0, 3);
   res.send(result);
 });
-
 
 app.get('/classes', (req, res) => {
   try {
@@ -94,7 +168,6 @@ app.get('/classes', (req, res) => {
   }
 });
 
-
 app.get('/classes/:id', (req, res) => {
   try {
     const id = req.params.id;
@@ -111,6 +184,7 @@ app.get('/classes/:id', (req, res) => {
   }
 });
 
+// --- BOOKING ROUTES --- //
 
 app.post('/bookings', (req, res) => {
   try {
@@ -124,7 +198,6 @@ app.post('/bookings', (req, res) => {
     res.status(500).send({ message: "Failed to book class" });
   }
 });
-
 
 app.get('/bookings', (req, res) => {
   try {
@@ -140,12 +213,12 @@ app.get('/bookings', (req, res) => {
   }
 });
 
+// --- FAVORITE ROUTES --- //
 
 app.post('/favorites', (req, res) => {
   try {
     const favorite = req.body;
 
-    
     const existing = favoritesData.find(
       fav => fav.userEmail === favorite.userEmail && String(fav.classId) === String(favorite.classId)
     );
@@ -165,7 +238,6 @@ app.post('/favorites', (req, res) => {
   }
 });
 
-
 app.get('/favorites', (req, res) => {
   try {
     const email = req.query.email;
@@ -180,7 +252,6 @@ app.get('/favorites', (req, res) => {
   }
 });
 
-
 app.delete('/favorites/:id', (req, res) => {
   try {
     const id = req.params.id;
@@ -192,11 +263,11 @@ app.delete('/favorites/:id', (req, res) => {
   }
 });
 
+// --- TRAINER APPLICATION ROUTES --- //
 
 app.post('/apply-trainer', (req, res) => {
   try {
     const application = req.body;
-    
     
     const userEmail = application.userEmail || application.email;
     const existing = applicationsData.find(
@@ -223,6 +294,11 @@ app.post('/apply-trainer', (req, res) => {
   }
 });
 
+app.get('/applied-trainers', (req, res) => {
+  res.send(applicationsData);
+});
+
+// --- STATS ROUTES --- //
 
 app.get('/user-stats', (req, res) => {
   try {
@@ -239,11 +315,11 @@ app.get('/user-stats', (req, res) => {
   }
 });
 
+// --- BASE ROUTE --- //
 
 app.get('/', (req, res) => {
   res.send('IronPulse Local Standalone Server is running perfectly!');
 });
-
 
 app.listen(port, () => {
   console.log(`Successfully running locally! Server is running on port: ${port}`);
